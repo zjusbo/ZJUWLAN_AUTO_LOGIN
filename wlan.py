@@ -1,4 +1,5 @@
 # -*- coding:utf-8 -*-
+#author: Sunny Song, ZJU
 import hashlib
 import urllib
 from urllib2 import Request, urlopen, URLError, HTTPError
@@ -15,9 +16,11 @@ password = 'yourpassword'
 
 
 exit = False
+debug = False
 passwordIncorrectTime = 0
 
 def isConnectedToInternet(url):
+	'''return true if host is already connected to the internet, otherwise return false.'''
 	req = Request(url)
 	try:
 		response = urlopen(req, timeout = 10)
@@ -32,11 +35,13 @@ def isConnectedToInternet(url):
 		else:
 
 			info = 'Unknown URLError'
-		#print info
+		if debug == True:
+			print info
 		return False
 	except Exception:
 		import traceback
-		#print "Generic exception: " + traceback.format_exc()
+		if debug == True:
+			print "Generic exception: " + traceback.format_exc()
 		return False
 	else:
 		if code == 200 and 'net.zju.edu.cn/srun_port1.php' not in content:
@@ -45,6 +50,7 @@ def isConnectedToInternet(url):
 			return False
 
 def isSpecifiedWlanAvaliable(name):
+	'''return true if specified wlan (name) is currently avaliable, otherwise return false. '''
 	p = subprocess.Popen(
 		'netsh wlan show networks',
 		shell = True,
@@ -57,6 +63,7 @@ def isSpecifiedWlanAvaliable(name):
 		return False
 
 def isConnectedToSpecifiedWlan(name):
+	'''return true if host is connected to specified wlan , otherwise return false. '''
 	p = subprocess.Popen(
 		'netsh wlan show interfaces' ,
 		shell = True,
@@ -69,6 +76,7 @@ def isConnectedToSpecifiedWlan(name):
 		return False
 
 def connectTo(name):
+	'''connect to specified wlan. '''
 	p = subprocess.Popen(
 		'netsh wlan connect {0}' .format(name),
 		shell = True,
@@ -76,13 +84,14 @@ def connectTo(name):
 		stderr = subprocess.PIPE)
 	stdout, stderr = p.communicate()
 	successMsg = u'已成功完成连接请求。'
-	#Since encoding rule ranges in different areas. Lenth of msg is used to justify the connection is successful
+	#Since encoding rule ranges in different areas. Length of msg is used to check whether the connection is successful or not.
 	if len(stdout) == 22 or 'Connection request was completed successfully' in stdout:
 		return True
 	else:
 		return False 
 
 def login(username, password):
+	'''login wlan using given username and password. '''
 	global passwordIncorrectTime
 	global exit
 	data = {'action':'login','username':username,'password':password,'ac_id':'3','type':'1','wbaredirect':'http://net.zju.edu.cn',
@@ -120,6 +129,9 @@ def login(username, password):
 		return False
 
 def logout(username, password):
+	'''logout using given username and password.
+	since in ZJU, one account only supports one host online concurrently. So previous hosts should be kicked off before login.  
+	'''
 	global exit
 	global passwordIncorrectTime
 	data = {'action':'auto_dm','username':username,'password':password}
@@ -156,6 +168,7 @@ def logout(username, password):
 		return False
 
 def main():
+	#Listen to the network status
 	while exit == False:
 		if isConnectedToInternet(testWebsite):
 			print "Connected."
@@ -165,7 +178,7 @@ def main():
 			print wlanName + "is not in range"
 			sleep(20)
 			continue
-		#wlan avaliable but can not connect to internet
+		#wlan is avaliable but host can not connect to the internet
 		if isConnectedToSpecifiedWlan(wlanName) == False:
 			print "Connecting to " + wlanName
 			status = connectTo(wlanName)
