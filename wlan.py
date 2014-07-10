@@ -1,5 +1,8 @@
 # -*- coding:utf-8 -*-
 #author: Sunny Song, ZJU
+#email: sbo@zju.edu.cn
+#last updated on 2014.7.10
+
 import hashlib
 import urllib
 from urllib2 import Request, urlopen, URLError, HTTPError
