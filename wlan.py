@@ -1,8 +1,6 @@
 # -*- coding:utf-8 -*-
 #author: Sunny Song, ZJU
 #email: sbo@zju.edu.cn
-#last updated on 2014.7.10
-
 import hashlib
 import urllib
 from urllib2 import Request, urlopen, URLError, HTTPError
@@ -10,17 +8,25 @@ from time import sleep
 import subprocess
 import urllib
 
-testWebsite = 'http://www.baidu.com'
-wlanName = 'ZJUWLAN'
 
+
+
+#Replace yourusername and yourpassword with your username and password
 username = 'yourusername' 
 password = 'yourpassword'
 
-
+#Configuration area
+testWebsite = 'http://www.baidu.com'
+wlanName = 'ZJUWLAN'
+maxRetryTimesForPassword = 3
+maxRetryTimesForServer = 5
+#Configuration area end.
 
 exit = False
 debug = False
-passwordIncorrectTime = 0
+refreshNetwork = False
+passwordIncorrectTimes = 0
+serverFailureTimes = 0
 
 def isConnectedToInternet(url):
 	'''return true if host is already connected to the internet, otherwise return false.'''
@@ -95,7 +101,7 @@ def connectTo(name):
 
 def login(username, password):
 	'''login wlan using given username and password. '''
-	global passwordIncorrectTime
+	global passwordIncorrectTimes
 	global exit
 	data = {'action':'login','username':username,'password':password,'ac_id':'3','type':'1','wbaredirect':'http://net.zju.edu.cn',
 	'mac':'undefined','user_ip':'','is_ldap':'1','local_auth':'1'}
@@ -106,14 +112,14 @@ def login(username, password):
 		response = urlopen(req,data, timeout = 10)	
 		content = response.read()
 		if 'help.html' in content:
-			passwordIncorrectTime = 0
+			passwordIncorrectTimes = 0
 			return True
 		else:
 			if len(content) == 27:#wrong password
 				print "Username or password is incorrect. Please check them again."
-				print "Retry for {0} more times." .format(3 - passwordIncorrectTime)
-				passwordIncorrectTime += 1
-				if passwordIncorrectTime == 3:
+				print "Retry for {0} more times." .format(maxRetryTimesForPassword - passwordIncorrectTimes)
+				passwordIncorrectTimes += 1
+				if passwordIncorrectTimes == 3:
 					exit = True
 			return False
 
@@ -133,10 +139,11 @@ def login(username, password):
 
 def logout(username, password):
 	'''logout using given username and password.
-	since in ZJU, one account only supports one host online concurrently. So previous hosts should be kicked off before login.  
+	since in ZJU, one account only supports one host online concurrently, so previous hosts should be kicked off before a new host logs in.  
 	'''
 	global exit
-	global passwordIncorrectTime
+	global passwordIncorrectTimes
+	global refreshNetwork
 	data = {'action':'auto_dm','username':username,'password':password}
 	data = urllib.urlencode(data)
 	try:
@@ -145,36 +152,61 @@ def logout(username, password):
 		response = urlopen(req, data, timeout = 10)
 		content = response.read()
 		if content == 'ok':
-			passwordIncorrectTime = 0
+			serverFailureTimes = 0
+			passwordIncorrectTimes = 0
 			return True
 		else:
 			if len(content) == 8:#Wrong password
 				print "Username or password is incorrect. Please check them again."
-				print "Retry for {0} more times." .format(3 - passwordIncorrectTime)
-				passwordIncorrectTime += 1
-				if passwordIncorrectTime == 3:
+				print "Retry for {0} more times." .format(maxRetryTimesForPassword - passwordIncorrectTimes)
+				passwordIncorrectTimes += 1
+				if passwordIncorrectTimes == maxRetryTimesForPassword:
 					exit = True
+			else:
+				print content #another unknown error reason
 			return False 
 
 	except URLError, e:
 		if hasattr(e, 'reason'):
-			info = '[Error] Failed to reach the server.\nReason: ' + str(e.reason)
+			# '[Error] Failed to reach the server.\nReason: ' + str(e.reason)
+			info = 'Failed to reach the server. Retry for {0} more times.' .format(maxRetryTimesForServer - serverFailureTimes)
+			serverFailureTimes += 1
+			if serverFailureTimes == maxRetryTimesForServer:
+				refreshNetwork = True
+
 		elif hasattr(e, 'code'):
 			info = '[Error] The server couldn\'t fullfill the request.\nError code: ' +str(e.code)
 		else:
 			info = 'Unknown URLError'
+		print info
 		return False
 
 	except Exception:
 		import traceback
 		print "Generic exception: " + traceback.format_exc()
+		print info
 		return False
+
+def cleanLog():
+	global refreshNetwork, passwordIncorrectTimes, serverFailureTimes
+	refreshNetwork = False
+	passwordIncorrectTimes = 0
+	serverFailureTimes = 0	
+
+def refreshNetwork():
+	p = subprocess.Popen(
+		'netsh wlan disconnect',
+		shell = True,
+		stdout = subprocess.PIPE,
+		stderr = subprocess.PIPE)
+	stdout, stderr = p.communicate()
 
 def main():
 	#Listen to the network status
 	while exit == False:
 		if isConnectedToInternet(testWebsite):
 			print "Connected."
+			cleanLog()
 			sleep(40)
 			continue
 		if isSpecifiedWlanAvaliable(wlanName) == False:
@@ -184,18 +216,27 @@ def main():
 		#wlan is avaliable but host can not connect to the internet
 		if isConnectedToSpecifiedWlan(wlanName) == False:
 			print "Connecting to " + wlanName
+			cleanLog()
 			status = connectTo(wlanName)
 			if status != True:
-				print status
+				print "Can not connect to {0}. Retry later." .format(wlanName)
 				sleep(10)
+			continue
+		if refreshNetwork == True:
+			cleanLog()
+			print "Refreshing network."
+			refreshNetwork()
 			continue
 		print "Login..."
 		print "Username: " + username
-		logout(username, password)
-		status = login(username, password)
-		
-		if status != True:
+		status = logout(username, password)
+		if status == False:
 			sleep(5)
+			continue
+		status = login(username, password)
+		if status == False:
+			sleep(5)
+			continue
 
 if __name__ == '__main__':
 	main()
