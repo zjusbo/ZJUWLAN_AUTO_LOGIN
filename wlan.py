@@ -19,7 +19,7 @@ password = 'yourpassword'
 testWebsite = 'http://www.baidu.com'
 wlanName = 'ZJUWLAN'
 maxRetryTimesForPassword = 3
-maxRetryTimesForServer = 5
+maxRetryTimesForServer = 3
 #Configuration area end.
 
 exit = False
@@ -142,7 +142,7 @@ def logout(username, password):
 	since in ZJU, one account only supports one host online concurrently, so previous hosts should be kicked off before a new host logs in.  
 	'''
 	global exit
-	global passwordIncorrectTimes
+	global passwordIncorrectTimes, serverFailureTimes
 	global refreshNetwork
 	data = {'action':'auto_dm','username':username,'password':password}
 	data = urllib.urlencode(data)
@@ -193,7 +193,7 @@ def cleanLog():
 	passwordIncorrectTimes = 0
 	serverFailureTimes = 0	
 
-def refreshNetwork():
+def refreshNetworkFunc():
 	p = subprocess.Popen(
 		'netsh wlan disconnect',
 		shell = True,
@@ -211,6 +211,7 @@ def main():
 			continue
 		if isSpecifiedWlanAvaliable(wlanName) == False:
 			print wlanName + "is not in range"
+			cleanLog()
 			sleep(20)
 			continue
 		#wlan is avaliable but host can not connect to the internet
@@ -225,7 +226,7 @@ def main():
 		if refreshNetwork == True:
 			cleanLog()
 			print "Refreshing network."
-			refreshNetwork()
+			refreshNetworkFunc()
 			continue
 		print "Login..."
 		print "Username: " + username
