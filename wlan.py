@@ -8,9 +8,6 @@ from time import sleep
 import subprocess
 import urllib
 
-
-
-
 #Replace yourusername and yourpassword with your username and password
 username = 'yourusername' 
 password = 'yourpassword'
