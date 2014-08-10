@@ -1,18 +1,47 @@
 # -*- coding:utf-8 -*-
 #author: Sunny Song, ZJU
 #email: sbo@zju.edu.cn
-import hashlib
-import urllib
-from urllib2 import Request, urlopen, URLError, HTTPError
-from time import sleep
-import subprocess
+
+#TODO
+#Add encryption algorithm to store username and password at localhost DONE
+#Test program
+
+#Import exit to exit program when necessary
+import sys
+
+#Import os module to do some IO work
+import os
+
+#Import universally unique indentifiers to generate encryption key
+import uuid
+
+#Import urlencode() in this package to encode post data
 import urllib
 
+#Import http relevant functions 
+from urllib2 import Request, urlopen, URLError, HTTPError
+
+#Import sleep() to control pace of the program
+from time import sleep
+
+#Import Popen() to make cmd command available in this program
+import subprocess
+
+#Import encryption functions, it is used to encrypt private data 
+import pyDes
+
+#Import database related functions
+import sqlite3
+
+#Import getpass word input method. (password will not be shown)
+from getpass import getpass
 #Replace yourusername and yourpassword with your username and password
-username = 'yourusername' 
-password = 'yourpassword'
 
 #Configuration area
+author_email = 'sbo@zju.edu.cn'
+
+db_name = 'pywin27.dll'
+
 testWebsite = 'http://www.baidu.com'
 wlanName = 'ZJUWLAN'
 maxRetryTimesForPassword = 3
@@ -46,7 +75,16 @@ class COLOR:
 	YELLOW = 14
 	WHITE = 15
 
+class KeyExpireError(Exception):
+	def __init__(self):
+		Exception.__init__(self)
+
+
 def cPrint(msg, color = COLOR.SILVER):
+	'''Print coloforul message in console.
+	msg -- message you want to print
+	color -- color you want to use. There are 16 colors available by default. More details are available in class COLOR.
+	'''
 	import ctypes
 	ctypes.windll.Kernel32.GetStdHandle.restype = ctypes.c_ulong
 	h = ctypes.windll.Kernel32.GetStdHandle(ctypes.c_ulong(0xfffffff5))
@@ -57,7 +95,14 @@ def cPrint(msg, color = COLOR.SILVER):
 	ctypes.windll.Kernel32.SetConsoleTextAttribute(h, COLOR.SILVER)
 
 def isConnectedToInternet(url):
-	'''return true if host is already connected to the internet, otherwise return false.'''
+	'''Check if the host is already connected to the Internet.
+	Parameter:
+		url -- URL of test website
+	Return value:
+		True -- the host can connect to the test URL.
+		False -- the host can not connect to the test URL.
+			In this scenario, error message shall be printed on the console. 
+	'''
 	req = Request(url)
 	try:
 		response = urlopen(req, timeout = 10)
@@ -73,7 +118,7 @@ def isConnectedToInternet(url):
 
 			info = '[ERROR] Unknown URLError'
 		if debug == True:
-			cPrint(info, COLOR.DARKRED)
+			cPrint(info, COLOR.RED)
 		return False
 	except Exception:
 		import traceback
@@ -86,8 +131,14 @@ def isConnectedToInternet(url):
 		else:
 			return False
 
-def isSpecifiedWlanAvaliable(name):
-	'''return true if specified wlan (name) is currently avaliable, otherwise return false. '''
+def isSpecifiedWlanAvailable(name):
+	'''Check if specified wlan is available to the host.
+	Parameter:
+		name -- wlan name
+	Return value:
+		True -- Specified wlan is available.
+		False -- Specified wlan is not available
+	'''
 	p = subprocess.Popen(
 		'netsh wlan show networks',
 		shell = True,
@@ -120,8 +171,7 @@ def connectTo(name):
 		stdout = subprocess.PIPE,
 		stderr = subprocess.PIPE)
 	stdout, stderr = p.communicate()
-	successMsg = u'已成功完成连接请求。'
-	#Since encoding rule ranges in different areas. Length of msg is used to check whether the connection is successful or not.
+	#Since encoding rule varies in different areas. Length of msg is used to check whether the connection is successful or not.
 	if len(stdout) == 22 or 'Connection request was completed successfully' in stdout:
 		return True
 	else:
@@ -145,11 +195,14 @@ def login(username, password):
 			return True
 		else:
 			if len(content) == 27:#wrong password
-				cPrint("[WARNING] Username or password is incorrect. Please check them again.",CLOLR.RED)
-				cPrint("[INFO] Retry for {0} more times." .format(maxRetryTimesForPassword - passwordIncorrectTimes))
-				passwordIncorrectTimes += 1
 				if passwordIncorrectTimes == 3:
 					exit = True
+				else:
+					cPrint("[WARNING] Username or password is incorrect. Please check them again.",CLOLR.DARKRED)
+					cPrint("[INFO] Retry for {0} more times." .format(maxRetryTimesForPassword - passwordIncorrectTimes))
+					passwordIncorrectTimes += 1	
+			else:
+				cPrint("[UNKNOWN ERROR] " + content,COLOR.RED)
 			return False
 
 	except URLError, e:
@@ -159,7 +212,7 @@ def login(username, password):
 			info = '[ERROR] The server couldn\'t fullfill the request.\nError code: ' +str(e.code)
 		else:
 			info = '[ERROR] Unknown URLError'
-		cPrint(info, COLOR.DARKRED)
+		cPrint(info, COLOR.RED)
 		return False
 
 	except Exception:
@@ -187,13 +240,14 @@ def logout(username, password):
 			return True
 		else:
 			if len(content) == 8:#Wrong password
-				cPrint("[WARNING] Username or password is incorrect. Please check them again.", COLOR.RED)
-				cPrint("[INFO] Retry for {0} more times." .format(maxRetryTimesForPassword - passwordIncorrectTimes))
-				passwordIncorrectTimes += 1
 				if passwordIncorrectTimes == maxRetryTimesForPassword:
 					exit = True
+				else:
+					cPrint("[WARNING] Username or password is incorrect. Please check them again.", COLOR.DARKRED)
+					cPrint("[INFO] Retry for {0} more times." .format(maxRetryTimesForPassword - passwordIncorrectTimes))
+					passwordIncorrectTimes += 1
 			else:
-				print content #another unknown error reason
+				cPrint('[UNKNOWN ERROR]' + content,COLOR.RED) #another unknown error reason
 			return False 
 
 	except URLError, e:
@@ -203,13 +257,13 @@ def logout(username, password):
 			serverFailureTimes += 1
 			if serverFailureTimes == maxRetryTimesForServer:
 				refreshNetwork = True
-			cPrint(info,COLOR.RED)
+			cPrint(info,COLOR.DARKRED)
 		elif hasattr(e, 'code'):
 			info = '[ERROR] The server couldn\'t fullfill the request.\nError code: ' +str(e.code)
-			cPrint(info, COLOR.DARKRED)
+			cPrint(info, COLOR.RED)
 		else:
 			info = '[ERROR] Unknown URLError'
-			cPrint(info, COLOR.DARKRED)
+			cPrint(info, COLOR.RED)
 		return False
 
 	except Exception:
@@ -233,34 +287,164 @@ def refreshNetworkFunc():
 		stderr = subprocess.PIPE)
 	stdout, stderr = p.communicate()
 
-def main():
-	#Listen to the network status
+def generateKey():
+	import uuid
+	from binascii import unhexlify as unhex
+	ud = uuid.uuid1()
+	ud = ud.hex
+	mac = ud[-12:]
+	hi_time = ud[12:16]
+	key = hi_time + mac
+	return unhex(key)
 
+def encrypt(text):
+	key = generateKey()
+	des = pyDes.des(key, padmode = pyDes.PAD_PKCS5)
+	return des.encrypt(text)
+def decrypt(cipher):
+	key = generateKey()
+	des = pyDes.des(key)
+	return des.decrypt(cipher, padmode = pyDes.PAD_PKCS5)
+def deleteDB(db_name):
+	if os.path.isfile(db_name):
+		os.remove(db_name)
+	else:
+		cPrint('[ERROR] DB does not exist.', COLOR.RED)
+def connectToDB(db_name):
+	conn = sqlite3.connect(db_name)
+	cu = conn.cursor()
+	sqlScript = '''CREATE TABLE IF NOT EXISTS user
+			(
+			userID INTEGER PRIMARY KEY AUTOINCREMENT,
+			userStudentID BLOB NOT NULL UNIQUE ON CONFLICT IGNORE,
+			userPassword BLOB NOT NULL
+			);
+		'''
+	try:
+		cu.execute(sqlScript)
+		conn.commit()
+	except sqlite3.DatabaseError,e:
+		#DB is damaged. Delete the file and create it again.
+		cPrint("[WARNING] Database is weird. Retrieving...", COLOR.DARKRED)
+		cu.close()
+		conn.close()
+		deleteDB(db_name)
+		
+		conn = sqlite3.connect(db_name)
+		cu=conn.cursor()
+		cu.execute(sqlScript)
+		conn.commit()
+		cPrint("[INFO] Database is retrieved.", COLOR.SILVER)
+	return (conn,cu)
+
+def fetchUserData(conn, cu):
+	cu.execute('''SELECT * FROM user''')
+	res = cu.fetchone()
+	if res == None:
+		return (None,None)
+	else:#res[0] = id, res[1] = studentID, res[2] = password
+		try:
+			username = decrypt(res[1])
+			password = decrypt(res[2])
+			if len(username) == 0 or len(password) == 0:
+				raise KeyExpireError
+		except ValueError, e:
+			cPrint("[WARNING] Database is damaged. Retrieving...", COLOR.DARKRED)
+			cleanDB(conn, cu)
+			username = password = None
+		except KeyExpireError, e:
+			cPrint("[WARNING] Session expires. Please enter username and password again.", COLOR.DARKRED)
+			cleanDB(conn, cu)
+			username = password = None
+		except Exception, e:
+			import traceback
+			print "Generic exception: " + traceback.format_exc()
+		finally:
+			return (username, password)
+
+def inputUsernameAndPassword():
+	'''get username and password from console
+		Return value:
+			(isRememberPassword, username, password) 
+	'''
+	username = raw_input("Please enter your username:")
+	password = getpass('Please enter your password(not be shown): ')
+	state = raw_input("Remember this password?(y/n)")
+	if state == 'Y' or state == 'y':
+		isRememberPassword = True
+	else:
+		isRememberPassword = False
+	return (isRememberPassword, username, password)
+
+def isUseThisUsername(username):
+	'''Ask user whether use the showed userneame to login.
+	Parameter:
+		username:
+	Return value:
+		True -- use this username
+		False -- do not use this username
+	'''
+	state = raw_input("Do you want to use account {0} to login?(y/n)" .format(username))
+	if state == 'Y' or state == 'y':
+		return True
+	else:
+		return False
+def insertUsernameAndPasswordToDB(conn, cu, username, password):
+	username = encrypt(username)
+	password = encrypt(password)
+	cu.execute("INSERT INTO user(userStudentID, userPassword) VALUES (?,?)", (buffer(username), buffer(password)) )
+	conn.commit()
+
+def cleanDB(conn,cu):
+	query = '''DELETE FROM user'''
+	cu.execute(query)
+	conn.commit()
+
+def main():
+	cPrint("Welcome to use ZJUWLAN auto login program.", COLOR.DARKGREEN)
+	cPrint("Find bugs? Report it to %s :)\n" % author_email, COLOR.SILVER)
+	(conn,cu) = connectToDB(db_name)
+	(username,password) = fetchUserData(conn, cu)
+	if username != None: #DB is not empty
+		if isUseThisUsername(username) == False:
+			#Clean DB and input new username and password
+			cleanDB(conn,cu)
+			username = password = None
+
+	if username == None:#DB is empty or user doesn't use the current username
+		(isRememberPassword, username, password) = inputUsernameAndPassword()
+		if isRememberPassword == True:
+			insertUsernameAndPasswordToDB(conn, cu, username, password)
+		else:
+			cleanDB(conn,cu)
+	cu.close()
+	conn.close()
+	#Listen to the network status
 	while exit == False:
 		cPrint('[INFO] Checking network status...')
 		if isConnectedToInternet(testWebsite):
-			cPrint("[SUCCESS] Connected to the Internet.", COLOR.GREEN)
+			cPrint("[SUCCESS] Connected to the Internet.", COLOR.DARKGREEN)
 			cleanLog()
 			sleep(20)
 			continue
-		if isSpecifiedWlanAvaliable(wlanName) == False:
-			cPrint("[WARNING] "+ wlanName + " is not in range", COLOR.RED)
+		if isSpecifiedWlanAvailable(wlanName) == False:
+			cPrint("[WARNING] "+ wlanName + " is not in range", COLOR.DARKRED)
 			cleanLog()
 			sleep(10)
 			continue
-		#wlan is avaliable but host can not connect to the internet
+		#wlan is available but host can not connect to the internet
 		if isConnectedToSpecifiedWlan(wlanName) == False:
 			cPrint('[INFO] Connecting to ' + wlanName + '...')
 			cleanLog()
 			status = connectTo(wlanName)
 			if status != True:
-				cPrint("[WARNING] Can not connect to {0}. Retry later." .format(wlanName), COLOR.RED)
+				cPrint("[WARNING] Can not connect to {0}. Retry later." .format(wlanName), COLOR.DARKRED)
 				sleep(5)
 				continue
 			else:
 				sleep(5) #wait 5s 
 		else:
-			cPrint('[SUCCESS] Connected to ' + wlanName + '.', COLOR.GREEN)
+			cPrint('[SUCCESS] Connected to ' + wlanName + '.', COLOR.DARKGREEN)
 		#if login success but can still not connect to the internet.
 		if refreshNetwork == True or isConnected == True: 
 			cleanLog()
@@ -278,6 +462,12 @@ def main():
 			sleep(5)
 			continue
 		else:
-			cPrint("[SUCCESS] Login Success.",COLOR.GREEN)
+			cPrint("[SUCCESS] Login Success.",COLOR.DARKGREEN)
+	else:
+		cPrint("\n[INFO] PROGRAM EXIT.",COLOR.SILVER)
+
 if __name__ == '__main__':
-	main()
+	try:
+		main()
+	except KeyboardInterrupt,e:
+		cPrint("\n[INFO] PROGRAM EXIT.",COLOR.SILVER)
