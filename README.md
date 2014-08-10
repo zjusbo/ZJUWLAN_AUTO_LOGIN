@@ -12,4 +12,3 @@ Author: Song Bo
 
 Email: sbo@zju.edu.cn
 
-Credit to: [Hexcles](https://gist.github.com/Hexcles)
