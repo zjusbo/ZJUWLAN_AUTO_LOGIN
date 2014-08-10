@@ -46,9 +46,12 @@ testWebsite = 'http://www.baidu.com'
 wlanName = 'ZJUWLAN'
 maxRetryTimesForPassword = 3
 maxRetryTimesForServer = 3
+
+wifiNamePrefix = 'WLAN_'
 #Configuration area end.
 
 #Global status area
+isAskedTurnOnWifi = False
 exit = False
 debug = False
 refreshNetwork = False
@@ -79,7 +82,6 @@ class KeyExpireError(Exception):
 	def __init__(self):
 		Exception.__init__(self)
 
-
 def cPrint(msg, color = COLOR.SILVER):
 	'''Print coloforul message in console.
 	msg -- message you want to print
@@ -94,6 +96,14 @@ def cPrint(msg, color = COLOR.SILVER):
 	print msg
 	ctypes.windll.Kernel32.SetConsoleTextAttribute(h, COLOR.SILVER)
 
+def welcomeMsg():
+	lineLength = 45
+	line1 = 'Welcome to ZJUWLAN_AUTO_LOGIN program'
+	line2 = 'Version 0.3'
+	line3 = 'Find bugs? Report it to %s :)' % author_email
+	cPrint("|----%s----|" %line1.center(lineLength), COLOR.DARKGREEN)
+	cPrint("|----%s----|" %line2.center(lineLength), COLOR.DARKGREEN)
+	cPrint("|----%s----|\n" %line3.center(lineLength), COLOR.DARKGREEN)
 def isConnectedToInternet(url):
 	'''Check if the host is already connected to the Internet.
 	Parameter:
@@ -176,6 +186,32 @@ def connectTo(name):
 		return True
 	else:
 		return False 
+
+def turnOnWifi(ssid, password):
+	if len(password) < 8:
+		cPrint("[WARNING] Password shall contains at least 8 characters", COLOR.DARDRED)
+		return False
+	p = subprocess.Popen(
+		'netsh wlan stop hostednetwork',
+		shell = True,
+		stdout = subprocess.PIPE,
+		stderr = subprocess.PIPE)
+	stdout, stderr = p.communicate()
+
+	p = subprocess.Popen(
+		'netsh wlan set hostednetwork mode=allow ssid=%s key=%s' %(ssid, password),
+		shell = True,
+		stdout = subprocess.PIPE,
+		stderr = subprocess.PIPE)
+	stdout, stderr = p.communicate()
+
+	p = subprocess.Popen(
+		'netsh wlan start hostednetwork',
+		shell = True,
+		stdout = subprocess.PIPE,
+		stderr = subprocess.PIPE)
+	stdout, stderr = p.communicate()
+	return True
 
 def login(username, password):
 	'''login wlan using given username and password. '''
@@ -367,9 +403,9 @@ def inputUsernameAndPassword():
 		Return value:
 			(isRememberPassword, username, password) 
 	'''
-	username = raw_input("Please enter your username:")
+	username = raw_input("Please enter your ZJUWLAN username:")
 	password = getpass('Please enter your password(not be shown): ')
-	state = raw_input("Remember this password?(y/n)")
+	state = raw_input("Remember this password on this laptop?(y/n)")
 	if state == 'Y' or state == 'y':
 		isRememberPassword = True
 	else:
@@ -399,10 +435,44 @@ def cleanDB(conn,cu):
 	query = '''DELETE FROM user'''
 	cu.execute(query)
 	conn.commit()
+def isAskedTurnOnWifiFunc():
+	return isAskedTurnOnWifi
+def isTurnOnWifi():
+	global isAskedTurnOnWifi
+	isAskedTurnOnWifi = True
+	state = raw_input("Do you want to turn on your laptop hotspot?(y/n)")
+	if state == 'Y' or state == 'y':
+		return True
+	else:
+		return False
+def inputWifiName():
+	global wifiNamePrefix
+	nameLength = 0
+	while nameLength == 0:
+		wifiName = raw_input("Please enter the hotspot name:")
+		nameLength = len(wifiName)
+	return wifiNamePrefix + wifiName
 
+def generatePassword(length, mode = None):
+	if isinstance(length, int) == False:
+		raise TypeError
+	if length < 1:
+		return None
+	seed = uuid.uuid4().int
+	password = ""
+	for x in xrange(0,length):
+		#[a-zA-Z0-9] 62 characters in total
+		c = seed % 62
+		seed = seed // 62
+		if c < 10:
+			password += chr(c+ord('0'))
+		elif c < 36:
+			password += chr(c+ord('A') - 10)
+		else:
+			password += chr(c+ord('a') - 36)
+	return password
 def main():
-	cPrint("Welcome to use ZJUWLAN auto login program.", COLOR.DARKGREEN)
-	cPrint("Find bugs? Report it to %s :)\n" % author_email, COLOR.SILVER)
+	welcomeMsg()
 	(conn,cu) = connectToDB(db_name)
 	(username,password) = fetchUserData(conn, cu)
 	if username != None: #DB is not empty
@@ -425,8 +495,18 @@ def main():
 		if isConnectedToInternet(testWebsite):
 			cPrint("[SUCCESS] Connected to the Internet.", COLOR.DARKGREEN)
 			cleanLog()
-			sleep(20)
-			continue
+			if isAskedTurnOnWifiFunc() == False:
+				if isTurnOnWifi() == True:
+					wifiName = inputWifiName()
+					wifiPassword = generatePassword(8)
+					if turnOnWifi(wifiName, wifiPassword) == True:
+						cPrint("[SUCESS] Wifi %s is on work." % wifiName, COLOR.DARKGREEN)
+						cPrint("[SUCESS] Wifi Password: %s" % wifiPassword, COLOR.BLUE)
+				else:
+					continue
+			else:
+				sleep(20)
+				continue
 		if isSpecifiedWlanAvailable(wlanName) == False:
 			cPrint("[WARNING] "+ wlanName + " is not in range", COLOR.DARKRED)
 			cleanLog()
