@@ -12,7 +12,7 @@ import sys
 #Import os module to do some IO work
 import os
 
-#Import universally unique indentifiers to generate encryption key
+#Import universally unique identifiers to generate encryption key
 import uuid
 
 #Import urlencode() in this package to encode post data
@@ -35,7 +35,7 @@ import sqlite3
 
 #Import getpass word input method. (password will not be shown)
 from getpass import getpass
-#Replace yourusername and yourpassword with your username and password
+
 
 #Configuration area
 author_email = 'sbo@zju.edu.cn'
@@ -47,6 +47,7 @@ wlanName = 'ZJUWLAN'
 maxRetryTimesForPassword = 3
 maxRetryTimesForServer = 3
 
+DecryptionIdentifier = "sbo@zju.edu.cn"
 wifiNamePrefix = 'WLAN_'
 #Configuration area end.
 
@@ -78,14 +79,16 @@ class COLOR:
 	YELLOW = 14
 	WHITE = 15
 
-class KeyExpireError(Exception):
+class DecryptionError(Exception):
 	def __init__(self):
 		Exception.__init__(self)
 
-def cPrint(msg, color = COLOR.SILVER):
+def cPrint(msg, color = COLOR.SILVER, mode = 0):
 	'''Print coloforul message in console.
 	msg -- message you want to print
 	color -- color you want to use. There are 16 colors available by default. More details are available in class COLOR.
+	mode -- 0: newline at the end
+		 1: no newline at the end 
 	'''
 	import ctypes
 	ctypes.windll.Kernel32.GetStdHandle.restype = ctypes.c_ulong
@@ -93,7 +96,12 @@ def cPrint(msg, color = COLOR.SILVER):
 	if isinstance(color, int) == False or color < 0 or color > 15:
 		color = COLOR.SILVER #
 	ctypes.windll.Kernel32.SetConsoleTextAttribute(h, color)
-	print msg
+	if mode == 0:
+		print msg
+	elif mode == 1:
+		import sys
+		sys.stdout.write(msg)
+		sys.stdout.flush()
 	ctypes.windll.Kernel32.SetConsoleTextAttribute(h, COLOR.SILVER)
 
 def welcomeMsg():
@@ -334,13 +342,22 @@ def generateKey():
 	return unhex(key)
 
 def encrypt(text):
+	if isinstance(text, str) == False:
+		raise TypeError
 	key = generateKey()
+	text = DecryptionIdentifier + text
 	des = pyDes.des(key, padmode = pyDes.PAD_PKCS5)
 	return des.encrypt(text)
 def decrypt(cipher):
 	key = generateKey()
 	des = pyDes.des(key)
-	return des.decrypt(cipher, padmode = pyDes.PAD_PKCS5)
+	dcyIDLen = len(DecryptionIdentifier)
+	text = des.decrypt(cipher, padmode = pyDes.PAD_PKCS5)
+	if len(text) < dcyIDLen or text[0:dcyIDLen] != DecryptionIdentifier:
+		raise DecryptionError
+	else:
+		text = text[dcyIDLen:]
+		return text
 def deleteDB(db_name):
 	if os.path.isfile(db_name):
 		os.remove(db_name)
@@ -382,13 +399,11 @@ def fetchUserData(conn, cu):
 		try:
 			username = decrypt(res[1])
 			password = decrypt(res[2])
-			if len(username) == 0 or len(password) == 0:
-				raise KeyExpireError
 		except ValueError, e:
 			cPrint("[WARNING] Database is damaged. Retrieving...", COLOR.DARKRED)
 			cleanDB(conn, cu)
 			username = password = None
-		except KeyExpireError, e:
+		except DecryptionError, e:
 			cPrint("[WARNING] Session expires. Please enter username and password again.", COLOR.DARKRED)
 			cleanDB(conn, cu)
 			username = password = None
@@ -403,8 +418,14 @@ def inputUsernameAndPassword():
 		Return value:
 			(isRememberPassword, username, password) 
 	'''
-	username = raw_input("Please enter your ZJUWLAN username:")
-	password = getpass('Please enter your password(not be shown): ')
+	usernameLength = 0
+	while usernameLength == 0:
+		username = raw_input("Please enter your ZJUWLAN username:")
+		usernameLength = len(username)
+	passwordLength = 0
+	while passwordLength == 0:
+		password = getpass('Please enter your password(not be shown): ')
+		passwordLength = len(password)
 	state = raw_input("Remember this password on this laptop?(y/n)")
 	if state == 'Y' or state == 'y':
 		isRememberPassword = True
@@ -420,7 +441,10 @@ def isUseThisUsername(username):
 		True -- use this username
 		False -- do not use this username
 	'''
-	state = raw_input("Do you want to use account {0} to login?(y/n)" .format(username))
+	cPrint("Do you want to use account", color = COLOR.SILVER, mode = 1)
+	cPrint(" %s " %username, color = COLOR.BROWN, mode = 1)
+	cPrint("to login?(y/n)", color = COLOR.SILVER, mode = 1)
+	state = raw_input()
 	if state == 'Y' or state == 'y':
 		return True
 	else:
@@ -501,7 +525,8 @@ def main():
 					wifiPassword = generatePassword(8)
 					if turnOnWifi(wifiName, wifiPassword) == True:
 						cPrint("[SUCESS] Wifi %s is on work." % wifiName, COLOR.DARKGREEN)
-						cPrint("[SUCESS] Wifi Password: %s" % wifiPassword, COLOR.BLUE)
+						cPrint("[INFO] Wifi Password:", COLOR.SILVER, mode = 1)
+						cPrint(" %s " % wifiPassword, COLOR.BROWN, mode = 0)	
 				else:
 					continue
 			else:
