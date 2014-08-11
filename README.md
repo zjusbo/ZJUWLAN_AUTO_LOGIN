@@ -12,4 +12,5 @@ Author: Song Bo
 
 Email: sbo@zju.edu.cn
 
-This file is under dev branch.
+
+TODO: Currently this program is using http protocol to login. It may be possible to login via vpn or other faster protocols. 
