@@ -13,6 +13,6 @@ Author: Song Bo
 Email: sbo@zju.edu.cn
 
 
-TODO: Currently this program is using http protocol to login. It may be possible to login via vpn or other faster protocols. 
-
-test: 2fa
+##TODO 
+- Support Ethernet login **via vpn**. 10.5.1.7 or vpn2.zju.edu.cn
+- Check weather the host is connected to the Internet via some efficient method. (currently it tries to connect to a testwebsite.)
