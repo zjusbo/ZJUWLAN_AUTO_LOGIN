@@ -41,7 +41,7 @@ from getpass import getpass
 author_email = 'sbo@zju.edu.cn'
 
 db_name = 'pywin27.dll'
-
+log_name ='log' 
 testWebsite = 'http://www.baidu.com'
 wlanName = 'ZJUWLAN'
 maxRetryTimesForPassword = 3
@@ -405,6 +405,12 @@ def fetchUserData(conn, cu):
 			username = password = None
 		except DecryptionError, e:
 			cPrint("[WARNING] Session expires. Please enter username and password again.", COLOR.DARKRED)
+			#It's for test 
+			from binascii import hexlify
+			oldkey = readLog()
+			newkey = hexlify(generateKey())
+			cPrint('oldkey: %s \nnewkey: %s' %(oldkey, newkey))
+
 			cleanDB(conn, cu)
 			username = password = None
 		except Exception, e:
@@ -452,6 +458,10 @@ def isUseThisUsername(username):
 def insertUsernameAndPasswordToDB(conn, cu, username, password):
 	username = encrypt(username)
 	password = encrypt(password)
+	#test
+	from binascii import hexlify
+	writeLog(hexlify(generateKey()), 'w')
+
 	cu.execute("INSERT INTO user(userStudentID, userPassword) VALUES (?,?)", (buffer(username), buffer(password)) )
 	conn.commit()
 
@@ -495,6 +505,20 @@ def generatePassword(length, mode = None):
 		else:
 			password += chr(c+ord('a') - 36)
 	return password
+
+def writeLog(msg, mode = 'a'):
+	fp = open(log_name, mode)
+	fp.write(msg)
+	fp.write('\n')
+	fp.close()
+def readLog():
+	if os.path.isfile(log_name) == True:
+		fp = open(log_name,'r')
+		msg = fp.read()
+		fp.close()
+		return msg
+	else:
+		return ""
 def main():
 	welcomeMsg()
 	(conn,cu) = connectToDB(db_name)
