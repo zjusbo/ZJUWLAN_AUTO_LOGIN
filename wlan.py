@@ -1,10 +1,19 @@
 # -*- coding:utf-8 -*-
+#
+# AUTO_LOGIN_ZJUWLAN and AUTO_START_HOTSPOT
+#
 #author: Sunny Song, ZJU
 #email: sbo@zju.edu.cn
 
 #TODO
-#Add encryption algorithm to store username and password at localhost DONE
+#Add encryption algorithm to store username and password at localhost --- DONE
 #Test program
+
+#f31b33bd9e51
+#ac728922b356
+#eb9a593aae24
+#ffbf11aa023d
+#e96f44dp7b07
 
 #Import exit to exit program when necessary
 import sys
@@ -39,10 +48,13 @@ from getpass import getpass
 
 #Configuration area
 author_email = 'sbo@zju.edu.cn'
-
+author_name = 'Song Bo'
+date = '2014.8.22'
+version = 'V0.3.2'
 db_name = 'pywin27.dll'
 log_name ='log' 
-testWebsite = 'http://www.baidu.com'
+testWebsite1 = 'http://www.baidu.com'
+testWebsite2 = 'http://www.google.com'
 wlanName = 'ZJUWLAN'
 maxRetryTimesForPassword = 3
 maxRetryTimesForServer = 3
@@ -106,9 +118,9 @@ def cPrint(msg, color = COLOR.SILVER, mode = 0):
 
 def welcomeMsg():
 	lineLength = 45
-	line1 = 'Welcome to ZJUWLAN_AUTO_LOGIN program'
-	line2 = 'Version 0.3'
-	line3 = 'Find bugs? Report it to %s :)' % author_email
+	line1 = 'Welcome to use ZJUWLAN_AUTO_LOGIN %s' %(version)
+	line2 = 'Find bugs or have advices?'
+	line3 = ' Report it to %s :)' % (author_email)
 	cPrint("|----%s----|" %line1.center(lineLength), COLOR.DARKGREEN)
 	cPrint("|----%s----|" %line2.center(lineLength), COLOR.DARKGREEN)
 	cPrint("|----%s----|\n" %line3.center(lineLength), COLOR.DARKGREEN)
@@ -348,6 +360,7 @@ def encrypt(text):
 	text = DecryptionIdentifier + text
 	des = pyDes.des(key, padmode = pyDes.PAD_PKCS5)
 	return des.encrypt(text)
+
 def decrypt(cipher):
 	key = generateKey()
 	des = pyDes.des(key)
@@ -363,6 +376,7 @@ def deleteDB(db_name):
 		os.remove(db_name)
 	else:
 		cPrint('[ERROR] DB does not exist.', COLOR.RED)
+
 def connectToDB(db_name):
 	conn = sqlite3.connect(db_name)
 	cu = conn.cursor()
@@ -483,7 +497,7 @@ def inputWifiName():
 	global wifiNamePrefix
 	nameLength = 0
 	while nameLength == 0:
-		wifiName = raw_input("Please enter the hotspot name:")
+		wifiName = raw_input("Please set your wifi name(SSID):")
 		nameLength = len(wifiName)
 	return wifiNamePrefix + wifiName
 
@@ -540,7 +554,7 @@ def main():
 	#Listen to the network status
 	while exit == False:
 		cPrint('[INFO] Checking network status...')
-		if isConnectedToInternet(testWebsite):
+		if isConnectedToInternet(testWebsite1) or isConnectedToInternet(testWebsite2):
 			cPrint("[SUCCESS] Connected to the Internet.", COLOR.DARKGREEN)
 			cleanLog()
 			if isAskedTurnOnWifiFunc() == False:
@@ -548,7 +562,7 @@ def main():
 					wifiName = inputWifiName()
 					wifiPassword = generatePassword(8)
 					if turnOnWifi(wifiName, wifiPassword) == True:
-						cPrint("[SUCESS] Wifi %s is on work." % wifiName, COLOR.DARKGREEN)
+						cPrint("[SUCCESS] Wifi %s is on work." % wifiName, COLOR.DARKGREEN)
 						cPrint("[INFO] Wifi Password:", COLOR.SILVER, mode = 1)
 						cPrint(" %s " % wifiPassword, COLOR.BROWN, mode = 0)	
 				else:
