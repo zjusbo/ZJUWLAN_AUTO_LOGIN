@@ -7,13 +7,18 @@
 
 #TODO
 #Add encryption algorithm to store username and password at localhost --- DONE
+#Fix the bug, which would get random-like MAC address - DONE 
 #Test program
 
 #f31b33bd9e51
-#ac728922b356
 #eb9a593aae24
 #ffbf11aa023d
 #e96f44dp7b07
+#b287eddf395a
+#9e0f3a57c719
+#a296d823dffd
+#932aea5f619d
+
 
 #Import exit to exit program when necessary
 import sys
@@ -343,12 +348,74 @@ def refreshNetworkFunc():
 		stderr = subprocess.PIPE)
 	stdout, stderr = p.communicate()
 
+def _ipconfig_getnode():
+	"""Get the hardware address on Windows by running ipconfig.exe."""
+
+	def _random_getnode():
+		"""Get a random node ID, with eighth bit set as suggested by RFC 4122."""
+		import random
+		return random.randrange(0, 1<<48L) | 0x010000000000L
+
+	import os, re
+	dirs = ['', r'c:\windows\system32', r'c:\winnt\system32']
+	try:
+		import ctypes
+		buffer = ctypes.create_string_buffer(300)
+		ctypes.windll.kernel32.GetSystemDirectoryA(buffer, 300)
+		dirs.insert(0, buffer.value.decode('mbcs'))
+	except:
+		pass
+	for dir in dirs:
+		try:
+			pipe = os.popen(os.path.join(dir, 'ipconfig') + ' /all')
+		except IOError:
+			continue
+		bestMacAddress = '000000000000'
+		for line in pipe:
+			value = line.split(':')[-1].strip().lower()
+			if re.match('([0-9a-f][0-9a-f]-){5}[0-9a-f][0-9a-f]', value):
+				value = value.replace('-', '')
+				if value.count('0') < bestMacAddress.count('0'):
+					bestMacAddress = value
+		if bestMacAddress != '000000000000':
+			return bestMacAddress
+		else:
+			return None
+
+#To be debuged. It is not tested cause there is not an OS/linux platform handy.
+def _ifconfig_getnode():
+	"""Get the hardware address on Unix by running ifconfig."""
+	# This works on Linux ('' or '-a'), Tru64 ('-av'), but not all Unixes.
+	for args in ('', '-a', '-av'):
+		mac = _find_mac('ifconfig', args, ['hwaddr', 'ether'], lambda i: i+1)
+	if mac:
+		return str(mac)
+
+	import socket
+	ip_addr = socket.gethostbyname(socket.gethostname())
+	# Try getting the MAC addr from arp based on our IP address (Solaris).
+	mac = _find_mac('arp', '-an', [ip_addr], lambda i: -1)
+	if mac:
+		return str(mac)
+
+	# This might work on HP-UX.
+	mac = _find_mac('lanscan', '-ai', ['lan0'], lambda i: 0)
+	if mac:
+		return str(mac)
+	return None
+
 def generateKey():
 	import uuid
+	import sys
 	from binascii import unhexlify as unhex
+	if sys.platform == 'win32':
+		mac = _ipconfig_getnode()
+	else:
+		mac = _ifconfig_getnode()
+	if mac == None:
+		mac = hex(_random_getnode())[2:-1]
 	ud = uuid.uuid1()
 	ud = ud.hex
-	mac = ud[-12:]
 	hi_time = ud[12:16]
 	key = hi_time + mac
 	return unhex(key)
