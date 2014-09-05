@@ -2,6 +2,6 @@
 
 test.py
 *.py[cod]
-*.dll
+pywin27.dll
 *.db
 log
