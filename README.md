@@ -12,3 +12,11 @@ Author: Song Bo
 
 Email: sbo@zju.edu.cn
 
+
+##BUG
+- Key expires so quick. It only last about 1 day. Checking it...
+
+##TODO 
+- Support Ethernet login **via vpn**. 10.5.1.7 or vpn2.zju.edu.cn
+- Check weather the host is connected to the Internet via some efficient method. (currently it tries to connect to a testwebsite.)
+

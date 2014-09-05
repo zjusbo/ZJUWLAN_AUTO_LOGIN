@@ -2,3 +2,6 @@
 
 test.py
 *.py[cod]
+*.dll
+*.db
+log

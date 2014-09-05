@@ -1,10 +1,14 @@
 # -*- coding:utf-8 -*-
+#
+# AUTO_LOGIN_ZJUWLAN and AUTO_START_HOTSPOT
+#
 #author: Sunny Song, ZJU
 #email: sbo@zju.edu.cn
 
 #TODO
-#Add encryption algorithm to store username and password at localhost DONE
-#Test program
+#Add encryption algorithm to store username and password at localhost --- DONE
+#Fix the bug, which would get random-like MAC address - DONE 
+#Modularization. 
 
 #Import exit to exit program when necessary
 import sys
@@ -12,7 +16,7 @@ import sys
 #Import os module to do some IO work
 import os
 
-#Import universally unique indentifiers to generate encryption key
+#Import universally unique identifiers to generate encryption key
 import uuid
 
 #Import urlencode() in this package to encode post data
@@ -35,18 +39,22 @@ import sqlite3
 
 #Import getpass word input method. (password will not be shown)
 from getpass import getpass
-#Replace yourusername and yourpassword with your username and password
+
 
 #Configuration area
 author_email = 'sbo@zju.edu.cn'
-
+author_name = 'Song Bo'
+date = '2014.8.22'
+version = 'V0.3.2'
 db_name = 'pywin27.dll'
-
-testWebsite = 'http://www.baidu.com'
+log_name ='log' 
+testWebsite1 = 'http://www.baidu.com'
+testWebsite2 = 'http://www.google.com' #Add this test website to support proxy check. 
 wlanName = 'ZJUWLAN'
 maxRetryTimesForPassword = 3
 maxRetryTimesForServer = 3
 
+DecryptionIdentifier = "sbo@zju.edu.cn"
 wifiNamePrefix = 'WLAN_'
 #Configuration area end.
 
@@ -78,14 +86,16 @@ class COLOR:
 	YELLOW = 14
 	WHITE = 15
 
-class KeyExpireError(Exception):
+class DecryptionError(Exception):
 	def __init__(self):
 		Exception.__init__(self)
 
-def cPrint(msg, color = COLOR.SILVER):
+def cPrint(msg, color = COLOR.SILVER, mode = 0):
 	'''Print coloforul message in console.
 	msg -- message you want to print
 	color -- color you want to use. There are 16 colors available by default. More details are available in class COLOR.
+	mode -- 0: newline at the end
+		 1: no newline at the end 
 	'''
 	import ctypes
 	ctypes.windll.Kernel32.GetStdHandle.restype = ctypes.c_ulong
@@ -93,14 +103,19 @@ def cPrint(msg, color = COLOR.SILVER):
 	if isinstance(color, int) == False or color < 0 or color > 15:
 		color = COLOR.SILVER #
 	ctypes.windll.Kernel32.SetConsoleTextAttribute(h, color)
-	print msg
+	if mode == 0:
+		print msg
+	elif mode == 1:
+		import sys
+		sys.stdout.write(msg)
+		sys.stdout.flush()
 	ctypes.windll.Kernel32.SetConsoleTextAttribute(h, COLOR.SILVER)
 
 def welcomeMsg():
 	lineLength = 45
-	line1 = 'Welcome to ZJUWLAN_AUTO_LOGIN program'
-	line2 = 'Version 0.3'
-	line3 = 'Find bugs? Report it to %s :)' % author_email
+	line1 = 'Welcome to use ZJUWLAN_AUTO_LOGIN %s' %(version)
+	line2 = 'Find bugs or have advices?'
+	line3 = ' Report it to %s :)' % (author_email)
 	cPrint("|----%s----|" %line1.center(lineLength), COLOR.DARKGREEN)
 	cPrint("|----%s----|" %line2.center(lineLength), COLOR.DARKGREEN)
 	cPrint("|----%s----|\n" %line3.center(lineLength), COLOR.DARKGREEN)
@@ -323,29 +338,102 @@ def refreshNetworkFunc():
 		stderr = subprocess.PIPE)
 	stdout, stderr = p.communicate()
 
+def _ipconfig_getnode():
+	"""Get the hardware address on Windows by running ipconfig.exe."""
+
+	def _random_getnode():
+		"""Get a random node ID, with eighth bit set as suggested by RFC 4122."""
+		import random
+		return random.randrange(0, 1<<48L) | 0x010000000000L
+
+	import os, re
+	dirs = ['', r'c:\windows\system32', r'c:\winnt\system32']
+	try:
+		import ctypes
+		buffer = ctypes.create_string_buffer(300)
+		ctypes.windll.kernel32.GetSystemDirectoryA(buffer, 300)
+		dirs.insert(0, buffer.value.decode('mbcs'))
+	except:
+		pass
+	for dir in dirs:
+		try:
+			pipe = os.popen(os.path.join(dir, 'ipconfig') + ' /all')
+		except IOError:
+			continue
+		bestMacAddress = '000000000000'
+		for line in pipe:
+			value = line.split(':')[-1].strip().lower()
+			if re.match('([0-9a-f][0-9a-f]-){5}[0-9a-f][0-9a-f]', value):
+				value = value.replace('-', '')
+				if value.count('0') < bestMacAddress.count('0'):
+					bestMacAddress = value
+		if bestMacAddress != '000000000000':
+			return bestMacAddress
+		else:
+			return None
+
+#To be debuged. It is not tested cause there is not an OS/linux platform handy.
+def _ifconfig_getnode():
+	"""Get the hardware address on Unix by running ifconfig."""
+	# This works on Linux ('' or '-a'), Tru64 ('-av'), but not all Unixes.
+	for args in ('', '-a', '-av'):
+		mac = _find_mac('ifconfig', args, ['hwaddr', 'ether'], lambda i: i+1)
+	if mac:
+		return str(mac)
+
+	import socket
+	ip_addr = socket.gethostbyname(socket.gethostname())
+	# Try getting the MAC addr from arp based on our IP address (Solaris).
+	mac = _find_mac('arp', '-an', [ip_addr], lambda i: -1)
+	if mac:
+		return str(mac)
+
+	# This might work on HP-UX.
+	mac = _find_mac('lanscan', '-ai', ['lan0'], lambda i: 0)
+	if mac:
+		return str(mac)
+	return None
+
 def generateKey():
 	import uuid
+	import sys
 	from binascii import unhexlify as unhex
+	if sys.platform == 'win32':
+		mac = _ipconfig_getnode()
+	else:
+		mac = _ifconfig_getnode()
+	if mac == None:
+		mac = hex(_random_getnode())[2:-1]
 	ud = uuid.uuid1()
 	ud = ud.hex
-	mac = ud[-12:]
 	hi_time = ud[12:16]
 	key = hi_time + mac
 	return unhex(key)
 
 def encrypt(text):
+	if isinstance(text, str) == False:
+		raise TypeError
 	key = generateKey()
+	text = DecryptionIdentifier + text
 	des = pyDes.des(key, padmode = pyDes.PAD_PKCS5)
 	return des.encrypt(text)
+
 def decrypt(cipher):
 	key = generateKey()
 	des = pyDes.des(key)
-	return des.decrypt(cipher, padmode = pyDes.PAD_PKCS5)
+	dcyIDLen = len(DecryptionIdentifier)
+	text = des.decrypt(cipher, padmode = pyDes.PAD_PKCS5)
+	if len(text) < dcyIDLen or text[0:dcyIDLen] != DecryptionIdentifier:
+		raise DecryptionError
+	else:
+		text = text[dcyIDLen:]
+		return text
 def deleteDB(db_name):
 	if os.path.isfile(db_name):
 		os.remove(db_name)
 	else:
 		cPrint('[ERROR] DB does not exist.', COLOR.RED)
+
 def connectToDB(db_name):
 	conn = sqlite3.connect(db_name)
 	cu = conn.cursor()
@@ -382,14 +470,18 @@ def fetchUserData(conn, cu):
 		try:
 			username = decrypt(res[1])
 			password = decrypt(res[2])
-			if len(username) == 0 or len(password) == 0:
-				raise KeyExpireError
 		except ValueError, e:
 			cPrint("[WARNING] Database is damaged. Retrieving...", COLOR.DARKRED)
 			cleanDB(conn, cu)
 			username = password = None
-		except KeyExpireError, e:
+		except DecryptionError, e:
 			cPrint("[WARNING] Session expires. Please enter username and password again.", COLOR.DARKRED)
+			#It's for test 
+			# from binascii import hexlify
+			# oldkey = readLog()
+			# newkey = hexlify(generateKey())
+			# cPrint('oldkey: %s \nnewkey: %s' %(oldkey, newkey))
+
 			cleanDB(conn, cu)
 			username = password = None
 		except Exception, e:
@@ -403,8 +495,14 @@ def inputUsernameAndPassword():
 		Return value:
 			(isRememberPassword, username, password) 
 	'''
-	username = raw_input("Please enter your ZJUWLAN username:")
-	password = getpass('Please enter your password(not be shown): ')
+	usernameLength = 0
+	while usernameLength == 0:
+		username = raw_input("Please enter your ZJUWLAN username:")
+		usernameLength = len(username)
+	passwordLength = 0
+	while passwordLength == 0:
+		password = getpass('Please enter your password(not be shown): ')
+		passwordLength = len(password)
 	state = raw_input("Remember this password on this laptop?(y/n)")
 	if state == 'Y' or state == 'y':
 		isRememberPassword = True
@@ -420,7 +518,10 @@ def isUseThisUsername(username):
 		True -- use this username
 		False -- do not use this username
 	'''
-	state = raw_input("Do you want to use account {0} to login?(y/n)" .format(username))
+	cPrint("Do you want to use account", color = COLOR.SILVER, mode = 1)
+	cPrint(" %s " %username, color = COLOR.BROWN, mode = 1)
+	cPrint("to login?(y/n)", color = COLOR.SILVER, mode = 1)
+	state = raw_input()
 	if state == 'Y' or state == 'y':
 		return True
 	else:
@@ -428,6 +529,10 @@ def isUseThisUsername(username):
 def insertUsernameAndPasswordToDB(conn, cu, username, password):
 	username = encrypt(username)
 	password = encrypt(password)
+	#test
+	from binascii import hexlify
+	writeLog(hexlify(generateKey()), 'w')
+
 	cu.execute("INSERT INTO user(userStudentID, userPassword) VALUES (?,?)", (buffer(username), buffer(password)) )
 	conn.commit()
 
@@ -449,7 +554,7 @@ def inputWifiName():
 	global wifiNamePrefix
 	nameLength = 0
 	while nameLength == 0:
-		wifiName = raw_input("Please enter the hotspot name:")
+		wifiName = raw_input("Please set your wifi name(SSID):")
 		nameLength = len(wifiName)
 	return wifiNamePrefix + wifiName
 
@@ -471,6 +576,20 @@ def generatePassword(length, mode = None):
 		else:
 			password += chr(c+ord('a') - 36)
 	return password
+
+def writeLog(msg, mode = 'a'):
+	fp = open(log_name, mode)
+	fp.write(msg)
+	fp.write('\n')
+	fp.close()
+def readLog():
+	if os.path.isfile(log_name) == True:
+		fp = open(log_name,'r')
+		msg = fp.read()
+		fp.close()
+		return msg
+	else:
+		return ""
 def main():
 	welcomeMsg()
 	(conn,cu) = connectToDB(db_name)
@@ -492,7 +611,7 @@ def main():
 	#Listen to the network status
 	while exit == False:
 		cPrint('[INFO] Checking network status...')
-		if isConnectedToInternet(testWebsite):
+		if isConnectedToInternet(testWebsite1) or isConnectedToInternet(testWebsite2):
 			cPrint("[SUCCESS] Connected to the Internet.", COLOR.DARKGREEN)
 			cleanLog()
 			if isAskedTurnOnWifiFunc() == False:
@@ -500,8 +619,9 @@ def main():
 					wifiName = inputWifiName()
 					wifiPassword = generatePassword(8)
 					if turnOnWifi(wifiName, wifiPassword) == True:
-						cPrint("[SUCESS] Wifi %s is on work." % wifiName, COLOR.DARKGREEN)
-						cPrint("[SUCESS] Wifi Password: %s" % wifiPassword, COLOR.BLUE)
+						cPrint("[SUCCESS] Wifi %s is on work." % wifiName, COLOR.DARKGREEN)
+						cPrint("[INFO] Wifi Password:", COLOR.SILVER, mode = 1)
+						cPrint(" %s " % wifiPassword, COLOR.BROWN, mode = 0)	
 				else:
 					continue
 			else:
