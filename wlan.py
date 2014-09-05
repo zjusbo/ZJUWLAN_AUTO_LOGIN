@@ -530,8 +530,8 @@ def insertUsernameAndPasswordToDB(conn, cu, username, password):
 	username = encrypt(username)
 	password = encrypt(password)
 	#test
-	from binascii import hexlify
-	writeLog(hexlify(generateKey()), 'w')
+	# from binascii import hexlify
+	# writeLog(hexlify(generateKey()), 'w')
 
 	cu.execute("INSERT INTO user(userStudentID, userPassword) VALUES (?,?)", (buffer(username), buffer(password)) )
 	conn.commit()
