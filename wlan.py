@@ -8,17 +8,7 @@
 #TODO
 #Add encryption algorithm to store username and password at localhost --- DONE
 #Fix the bug, which would get random-like MAC address - DONE 
-#Test program
-
-#f31b33bd9e51
-#eb9a593aae24
-#ffbf11aa023d
-#e96f44dp7b07
-#b287eddf395a
-#9e0f3a57c719
-#a296d823dffd
-#932aea5f619d
-
+#Modularization. 
 
 #Import exit to exit program when necessary
 import sys
@@ -59,7 +49,7 @@ version = 'V0.3.2'
 db_name = 'pywin27.dll'
 log_name ='log' 
 testWebsite1 = 'http://www.baidu.com'
-testWebsite2 = 'http://www.google.com'
+testWebsite2 = 'http://www.google.com' #Add this test website to support proxy check. 
 wlanName = 'ZJUWLAN'
 maxRetryTimesForPassword = 3
 maxRetryTimesForServer = 3
@@ -487,10 +477,10 @@ def fetchUserData(conn, cu):
 		except DecryptionError, e:
 			cPrint("[WARNING] Session expires. Please enter username and password again.", COLOR.DARKRED)
 			#It's for test 
-			from binascii import hexlify
-			oldkey = readLog()
-			newkey = hexlify(generateKey())
-			cPrint('oldkey: %s \nnewkey: %s' %(oldkey, newkey))
+			# from binascii import hexlify
+			# oldkey = readLog()
+			# newkey = hexlify(generateKey())
+			# cPrint('oldkey: %s \nnewkey: %s' %(oldkey, newkey))
 
 			cleanDB(conn, cu)
 			username = password = None
