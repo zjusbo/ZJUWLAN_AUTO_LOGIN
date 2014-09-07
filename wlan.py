@@ -37,15 +37,11 @@ import pyDes
 #Import database related functions
 import sqlite3
 
-#Import getpass word input method. (password will not be shown)
-from getpass import getpass
-
-
 #Configuration area
 author_email = 'sbo@zju.edu.cn'
 author_name = 'Song Bo'
 date = '2014.8.22'
-version = 'V0.3.2'
+version = 'V0.3.3'
 db_name = 'pywin27.dll'
 log_name ='log' 
 testWebsite1 = 'http://www.baidu.com'
@@ -110,6 +106,28 @@ def cPrint(msg, color = COLOR.SILVER, mode = 0):
 		sys.stdout.write(msg)
 		sys.stdout.flush()
 	ctypes.windll.Kernel32.SetConsoleTextAttribute(h, COLOR.SILVER)
+
+def pwd_input(msg = ''):
+	import msvcrt, sys
+
+	if msg != '':
+		sys.stdout.write(msg)
+	chars = []
+	while True:
+		newChar = msvcrt.getch()
+		if newChar in '\3\r\n': # 如果是换行，Ctrl+C，则输入结束
+			print ''
+			if newChar in '\3': # 如果是Ctrl+C，则将输入清空，返回空字符串
+				chars = []
+			break
+		elif newChar == '\b': # 如果是退格，则删除末尾一位
+			if chars:
+				del chars[-1]
+				sys.stdout.write('\b \b') # 左移一位，用空格抹掉星号，再退格
+		else:
+			chars.append(newChar)
+			sys.stdout.write('*') # 显示为星号
+	return ''.join(chars)
 
 def welcomeMsg():
 	lineLength = 45
@@ -495,13 +513,14 @@ def inputUsernameAndPassword():
 		Return value:
 			(isRememberPassword, username, password) 
 	'''
+
 	usernameLength = 0
 	while usernameLength == 0:
 		username = raw_input("Please enter your ZJUWLAN username:")
 		usernameLength = len(username)
 	passwordLength = 0
 	while passwordLength == 0:
-		password = getpass('Please enter your password(not be shown): ')
+		password = pwd_input('Please enter your password: ')
 		passwordLength = len(password)
 	state = raw_input("Remember this password on this laptop?(y/n)")
 	if state == 'Y' or state == 'y':
@@ -518,11 +537,11 @@ def isUseThisUsername(username):
 		True -- use this username
 		False -- do not use this username
 	'''
-	cPrint("Do you want to use account", color = COLOR.SILVER, mode = 1)
+	cPrint("Dear", color = COLOR.SILVER, mode = 1)
 	cPrint(" %s " %username, color = COLOR.BROWN, mode = 1)
-	cPrint("to login?(y/n)", color = COLOR.SILVER, mode = 1)
+	cPrint(", is it you?(y/n)", color = COLOR.SILVER, mode = 1)
 	state = raw_input()
-	if state == 'Y' or state == 'y':
+	if state == 'Y' or state == 'y' or state == '':
 		return True
 	else:
 		return False
@@ -550,15 +569,21 @@ def isTurnOnWifi():
 		return True
 	else:
 		return False
-def inputWifiName():
+def inputWifiNameAndPassword():
 	global wifiNamePrefix
 	nameLength = 0
 	while nameLength == 0:
 		wifiName = raw_input("Please set your wifi name(SSID):")
 		nameLength = len(wifiName)
-	return wifiNamePrefix + wifiName
+	wifiName = wifiNamePrefix + wifiName
+	passwordLength = 0
+	while passwordLength < 8:
+		wifiPassword = raw_input("Please set your wifi password(at least 8 digits): ")
+		passwordLength = len(wifiPassword)
+	return (wifiName, wifiPassword)
 
 def generatePassword(length, mode = None):
+	import random
 	if isinstance(length, int) == False:
 		raise TypeError
 	if length < 1:
@@ -567,8 +592,7 @@ def generatePassword(length, mode = None):
 	password = ""
 	for x in xrange(0,length):
 		#[a-zA-Z0-9] 62 characters in total
-		c = seed % 62
-		seed = seed // 62
+		c = random.randint(0,61)
 		if c < 10:
 			password += chr(c+ord('0'))
 		elif c < 36:
@@ -616,8 +640,7 @@ def main():
 			cleanLog()
 			if isAskedTurnOnWifiFunc() == False:
 				if isTurnOnWifi() == True:
-					wifiName = inputWifiName()
-					wifiPassword = generatePassword(8)
+					(wifiName, wifiPassword) = inputWifiNameAndPassword()
 					if turnOnWifi(wifiName, wifiPassword) == True:
 						cPrint("[SUCCESS] Wifi %s is on work." % wifiName, COLOR.DARKGREEN)
 						cPrint("[INFO] Wifi Password:", COLOR.SILVER, mode = 1)
