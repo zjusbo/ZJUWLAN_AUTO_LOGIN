@@ -49,6 +49,8 @@ testWebsite2 = 'http://www.google.com' #Add this test website to support proxy c
 wlanName = 'ZJUWLAN'
 maxRetryTimesForPassword = 3
 maxRetryTimesForServer = 3
+startWebsite = 'http://www.baidu.com'
+
 
 DecryptionIdentifier = "sbo@zju.edu.cn"
 wifiNamePrefix = 'WLAN_'
@@ -271,7 +273,7 @@ def login(username, password):
 					cPrint("[INFO] Retry for {0} more times." .format(maxRetryTimesForPassword - passwordIncorrectTimes))
 					passwordIncorrectTimes += 1	
 			else:
-				cPrint("[UNKNOWN ERROR] " + content,COLOR.RED)
+				cPrint("[UNKNOWN ERROR] " + content.decode('utf-8'),COLOR.RED)
 			return False
 
 	except URLError, e:
@@ -316,7 +318,7 @@ def logout(username, password):
 					cPrint("[INFO] Retry for {0} more times." .format(maxRetryTimesForPassword - passwordIncorrectTimes))
 					passwordIncorrectTimes += 1
 			else:
-				cPrint('[UNKNOWN ERROR]' + content,COLOR.RED) #another unknown error reason
+				cPrint('[UNKNOWN ERROR]' + content.decode('utf-8'),COLOR.RED) #another unknown error reason
 			return False 
 
 	except URLError, e:
@@ -639,14 +641,15 @@ def main():
 			cPrint("[SUCCESS] Connected to the Internet.", COLOR.DARKGREEN)
 			cleanLog()
 			if isAskedTurnOnWifiFunc() == False:
+				#following code runs only once. 
 				if isTurnOnWifi() == True:
 					(wifiName, wifiPassword) = inputWifiNameAndPassword()
 					if turnOnWifi(wifiName, wifiPassword) == True:
 						cPrint("[SUCCESS] Wifi %s is on work." % wifiName, COLOR.DARKGREEN)
 						cPrint("[INFO] Wifi Password:", COLOR.SILVER, mode = 1)
 						cPrint(" %s " % wifiPassword, COLOR.BROWN, mode = 0)	
-				else:
-					continue
+				os.system("start %s" %startWebsite)
+				continue
 			else:
 				sleep(20)
 				continue
