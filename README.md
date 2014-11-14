@@ -2,7 +2,7 @@ ZJUWLAN_AUTO_LOGIN
 ==================
 This is a Python script that helps you connect to ZJUWLAN automatically.
 
-It implements some basic functions such as wifi scanning, wifi connecting, login, disconnection recovering and error recovering.
+It implements some basic functions such as wifi scanning, wifi connecting, login, connection lost recovering and error recovering.
 
 Implemented in Python 2.7.6.
 
