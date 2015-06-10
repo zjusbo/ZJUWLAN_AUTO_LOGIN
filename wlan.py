@@ -38,6 +38,10 @@ import pyDes
 import sqlite3
 
 #Configuration area
+isSongBo = True
+myWifiName = 'WLAN_sbo'
+myWifiPassword = '12356789'
+
 author_email = 'sbo@zju.edu.cn'
 author_name = 'Song Bo'
 date = '2014.8.22'
@@ -153,6 +157,7 @@ def isConnectedToInternet(url):
 		response = urlopen(req, timeout = 10)
 		code = response.getcode()
 		content = response.read()
+		response.close()
 	except URLError, e:
 		if hasattr(e, 'reason'):
 			info = '[ERROR] Failed to reach the server.\nReason: ' + str(e.reason)
@@ -260,6 +265,7 @@ def login(username, password):
 		req = Request("https://net.zju.edu.cn/cgi-bin/srun_portal")
 		response = urlopen(req,data, timeout = 10)	
 		content = response.read()
+		response.close()
 		if 'help.html' in content:
 			passwordIncorrectTimes = 0
 			isConnected = True
@@ -305,6 +311,7 @@ def logout(username, password):
 
 		response = urlopen(req, data, timeout = 10)
 		content = response.read()
+		response.close()
 		if content == 'ok':
 			serverFailureTimes = 0
 			passwordIncorrectTimes = 0
@@ -496,12 +503,6 @@ def fetchUserData(conn, cu):
 			username = password = None
 		except DecryptionError, e:
 			cPrint("[WARNING] Session expires. Please enter username and password again.", COLOR.DARKRED)
-			#It's for test 
-			# from binascii import hexlify
-			# oldkey = readLog()
-			# newkey = hexlify(generateKey())
-			# cPrint('oldkey: %s \nnewkey: %s' %(oldkey, newkey))
-
 			cleanDB(conn, cu)
 			username = password = None
 		except Exception, e:
@@ -617,14 +618,18 @@ def readLog():
 	else:
 		return ""
 def main():
+	global exit
 	welcomeMsg()
 	(conn,cu) = connectToDB(db_name)
 	(username,password) = fetchUserData(conn, cu)
 	if username != None: #DB is not empty
-		if isUseThisUsername(username) == False:
-			#Clean DB and input new username and password
-			cleanDB(conn,cu)
-			username = password = None
+		if isSongBo == True:
+			pass
+		else:
+			if isUseThisUsername(username) == False:
+				#Clean DB and input new username and password
+				cleanDB(conn,cu)
+				username = password = None
 
 	if username == None:#DB is empty or user doesn't use the current username
 		(isRememberPassword, username, password) = inputUsernameAndPassword()
@@ -640,19 +645,34 @@ def main():
 		if isConnectedToInternet(testWebsite1) or isConnectedToInternet(testWebsite2):
 			cPrint("[SUCCESS] Connected to the Internet.", COLOR.DARKGREEN)
 			cleanLog()
-			if isAskedTurnOnWifiFunc() == False:
-				#following code runs only once. 
-				if isTurnOnWifi() == True:
-					(wifiName, wifiPassword) = inputWifiNameAndPassword()
+
+			if isSongBo == True:
+				if isAskedTurnOnWifiFunc() == False:
+					global isAskedTurnOnWifi
+					isAskedTurnOnWifi = True
+					wifiName = myWifiName
+					wifiPassword = myWifiPassword
 					if turnOnWifi(wifiName, wifiPassword) == True:
 						cPrint("[SUCCESS] Wifi %s is on work." % wifiName, COLOR.DARKGREEN)
 						cPrint("[INFO] Wifi Password:", COLOR.SILVER, mode = 1)
 						cPrint(" %s " % wifiPassword, COLOR.BROWN, mode = 0)	
-				os.system("start %s" %startWebsite)
+				sleep(1)
+				exit = True
 				continue
 			else:
-				sleep(20)
-				continue
+				if isAskedTurnOnWifiFunc() == False:
+					#following code runs only once. 
+					if isTurnOnWifi() == True:
+						(wifiName, wifiPassword) = inputWifiNameAndPassword()
+						if turnOnWifi(wifiName, wifiPassword) == True:
+							cPrint("[SUCCESS] Wifi %s is on work." % wifiName, COLOR.DARKGREEN)
+							cPrint("[INFO] Wifi Password:", COLOR.SILVER, mode = 1)
+							cPrint(" %s " % wifiPassword, COLOR.BROWN, mode = 0)	
+					os.system("start %s" %startWebsite)
+					continue
+				else:
+					sleep(20)
+					continue
 		if isSpecifiedWlanAvailable(wlanName) == False:
 			cPrint("[WARNING] "+ wlanName + " is not in range", COLOR.DARKRED)
 			cleanLog()

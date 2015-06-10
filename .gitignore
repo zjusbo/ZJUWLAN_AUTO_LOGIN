@@ -1,7 +1,2 @@
-#python
 
-test.py
-*.pyc
-pywin27.dll
-*.db
-log
+*.md
