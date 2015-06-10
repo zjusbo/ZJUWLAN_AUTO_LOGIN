@@ -38,7 +38,7 @@ import pyDes
 import sqlite3
 
 #Configuration area
-isSongBo = True
+isSongBo = False
 myWifiName = 'WLAN_sbo'
 myWifiPassword = '12356789'
 
@@ -668,11 +668,13 @@ def main():
 							cPrint("[SUCCESS] Wifi %s is on work." % wifiName, COLOR.DARKGREEN)
 							cPrint("[INFO] Wifi Password:", COLOR.SILVER, mode = 1)
 							cPrint(" %s " % wifiPassword, COLOR.BROWN, mode = 0)	
-					os.system("start %s" %startWebsite)
-					continue
-				else:
-					sleep(20)
-					continue
+					# os.system("start %s" %startWebsite)
+				sleep(1)
+				exit = True
+				continue
+				# else:
+				#	sleep(20)
+				#	continue
 		if isSpecifiedWlanAvailable(wlanName) == False:
 			cPrint("[WARNING] "+ wlanName + " is not in range", COLOR.DARKRED)
 			cleanLog()
