@@ -6,7 +6,7 @@ It implements some basic functions such as wifi scanning, wifi connecting, login
 
 Implemented in Python 2.7.6.
 
-Support OS: Windows 7.
+Support OS: Windows 7, MAC OS, Linux
 
 ##BUGS
 - Key expires so quick. It only last about 1 day. Checking it...SOLVED
