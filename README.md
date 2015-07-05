@@ -1,6 +1,6 @@
 ZJUWLAN_AUTO_LOGIN
 ==================
-This is a Python script that helps you connect to ZJUWLAN automatically.
+A ZJUWLAN login script, implemented in Python.
 
 It implements some basic functions such as wifi scanning, wifi connecting, login, connection lost recovering and error recovering.
 
@@ -9,7 +9,7 @@ Implemented in Python 2.7.6.
 Support OS: Windows 7, MAC OS, Linux
 
 ##BUGS
-- Key expires so quick. It only last about 1 day. Checking it...SOLVED
+- Key expires so quickly. It only last about 1 day. Checking it...SOLVED
 - Sometimes it refreshes the connection though we are still online, which causes a connection lost.
 
 ##TODO 
