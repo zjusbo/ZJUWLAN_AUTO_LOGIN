@@ -2,8 +2,9 @@
 #
 # AUTO_LOGIN_ZJUWLAN and AUTO_START_HOTSPOT
 #
-#author: Sunny Song, ZJU
-#email: sbo@zju.edu.cn
+#author: Bo Song, ZJU
+#email: bo.song@yale.edu
+#website: www.bo-song.com
 
 #TODO
 #Add encryption algorithm to store username and password at localhost --- DONE
