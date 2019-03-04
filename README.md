@@ -20,4 +20,4 @@ Support OS: Windows 7
 ##Author
 Bo Song
 
-bo.song@yale.edu
+songbo.sunny@gmail.com
